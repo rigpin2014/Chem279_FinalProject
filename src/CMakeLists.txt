@@ -1,1 +1,1 @@
-add_executable(rad_sim  rad_sim.cpp)
+add_executable(rad_sim  sim.cpp)
