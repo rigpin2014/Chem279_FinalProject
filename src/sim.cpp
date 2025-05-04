@@ -366,7 +366,7 @@ double sample_from_cdf(
 
     // Define an iterator where cdf[i] >= r
     auto it = std::lower_bound(cdf.begin(), cdf.end(), r);
-    if (it == cdf.begin()) return data.first();
+    if (it == cdf.begin()) return data.front();
     if (it == cdf.end()) return data.back();
 
     // Find the index of the iterator
@@ -375,7 +375,7 @@ double sample_from_cdf(
     // Define interpolation variables
     double cdf_low = cdf[i-1], cdf_high = cdf[i];
     double data_low = data[i-1], data_high = data[i];
-    double f = (r - cdf_low) / (cdf_high = cdf_low);
+    double f = (r - cdf_low) / (cdf_high - cdf_low);
 
     // Interpolate
     return data_low + f * (data_high - data_low);
@@ -474,13 +474,27 @@ int main(int argc, char** argv){
     int num_alpha_electrons = config["num_alpha_electrons"];
     int num_beta_electrons = config["num_beta_electrons"];
 
+    //==============================================================================
+    // Read the molecular information
+    //==============================================================================
+    std::vector<Atom> atoms = read_atoms(atoms_file_path);
+    int num_atoms = atoms.size();
+    
+    std::cout << "Number of atoms: " << atoms.size() << std::endl;
+    for (const auto& atom : atoms) {
+        std::cout << "Atomic number: " << atom.atomic_number << ", Coordinates ("
+                  << atom.coord[0] << ", " << atom.coord[1] << ", " << atom.coord[2]
+                  << ")" << std::endl;
+    }
+    std::cout << std::endl;
+
     //===============================================================================
     // Read the tables
     //===============================================================================
 
     // Read in the H-1 angular distributions
     std::vector<std::pair<double, std::vector<double>>> H1_angular_distributions;
-    read_angular_distributions("../../tables/H1_angular_distributions.txt", H1_angular_distributions);
+    read_angular_distributions("tables/H1_angular_distributions.txt", H1_angular_distributions);
 
     // Verify an entry
     std::cout << "H-1 Angular distribution check: " << std::endl;
@@ -493,7 +507,7 @@ int main(int argc, char** argv){
 
     // Read the O-16 angular distributions
     std::vector<std::pair<double, std::vector<double>>> O16_angular_distributions;
-    read_angular_distributions("../../tables/O16_angular_distributions.txt", O16_angular_distributions);
+    read_angular_distributions("tables/O16_angular_distributions.txt", O16_angular_distributions);
 
     // Verify an entry
     std::cout << "O-16 Angular distribution check: " << std::endl;
@@ -506,7 +520,7 @@ int main(int argc, char** argv){
 
     // Read the H-1 cross sections
     std::vector<std::pair<double, double>> H1_cross_sections;
-    read_cross_sections("../../tables/H1_cross_sections.txt", H1_cross_sections);
+    read_cross_sections("tables/H1_cross_sections.txt", H1_cross_sections);
 
     // Verify an entry
     std::cout << "H-1 Cross section check: " << std::endl;
@@ -515,7 +529,7 @@ int main(int argc, char** argv){
 
     //Read the O-16 cross sections
     std::vector<std::pair<double, double>> O16_cross_sections;
-    read_cross_sections("../../tables/O16_cross_sections.txt", O16_cross_sections);
+    read_cross_sections("tables/O16_cross_sections.txt", O16_cross_sections);
 
     // Verify an entry
     std::cout << "O-16 Cross section check: " << std::endl;
@@ -539,5 +553,8 @@ int main(int argc, char** argv){
 
     // Compute the most probable scattering angle in radians
     double most_probable_theta = compute_most_probable_scattering_angle(legendre_coeffs);
+
+    std::cout << "Most probable angle: " << most_probable_theta << std::endl;
+    
     return 0;
 }
