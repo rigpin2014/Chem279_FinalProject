@@ -1,8 +1,11 @@
+#pragma once
+
 #include <map>
 #include <string>
 #include <tuple>
 #include <utility>
 #include "forceField.hpp"
+
 using namespace std;
 
 class MMFF_Typer {

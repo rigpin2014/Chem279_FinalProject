@@ -5,8 +5,12 @@
 #include <cmath>
 #include <iostream>
 #include <sstream>
+#include <armadillo>
 
 using namespace std;
+
+// Conversion factor from mdynes/A to kcal/mol
+double MDYNE_PER_A_TO_KCAL_PER_MOL = 143.9325;
 
 // Map of element to atomic number
 map<string, int> element_to_atomic_number = {
@@ -28,28 +32,16 @@ double atom_dist(const Atom& a1, const Atom& a2) {
     return sqrt(dx*dx + dy*dy + dz*dz);
 }
 
-// Calculate angle between three atoms (in radians)
+// Calculate angle between three atoms (in degrees)
 double angle_between(const Atom& a1, const Atom& a2, const Atom& a3) {
-    double dx1 = a1.x - a2.x;
-    double dy1 = a1.y - a2.y;
-    double dz1 = a1.z - a2.z;
-
-    double dx2 = a3.x - a2.x;
-    double dy2 = a3.y - a2.y;
-    double dz2 = a3.z - a2.z;
-
-    // Normalize vectors
-    double len1 = sqrt(dx1*dx1 + dy1*dy1 + dz1*dz1);
-    double len2 = sqrt(dx2*dx2 + dy2*dy2 + dz2*dz2);
-    dx1 /= len1;
-    dy1 /= len1;
-    dz1 /= len1;
-    dx2 /= len2;
-    dy2 /= len2;
-    dz2 /= len2;
-
-    double dot = dx1*dx2 + dy1*dy2 + dz1*dz2;
-    return acos(dot);
+    arma::vec v1 = arma::vec({a1.x - a2.x, a1.y - a2.y, a1.z - a2.z});
+    arma::vec v2 = arma::vec({a3.x - a2.x, a3.y - a2.y, a3.z - a2.z});
+    double dot = arma::dot(v1, v2);
+    double len1 = arma::norm(v1);
+    double len2 = arma::norm(v2);
+    double radians = acos(dot / (len1 * len2));
+    double degrees = radians * 180.0 / M_PI;
+    return degrees;
 }
 
 // BOND CLASS FUNCTIONS
@@ -73,12 +65,12 @@ Angle::Angle(int atom1, int atom2, int atom3, AngleParam param)
     : atom1(atom1), atom2(atom2), atom3(atom3), param(param) {}
 
 // TORSION CLASS FUNCTIONS
-TorsionParam::TorsionParam(double k, double n, double delta)
-    : k(k), n(n), delta(delta) {}
+// TorsionParam::TorsionParam(double k, double n, double delta)
+//     : k(k), n(n), delta(delta) {}
 
 // NONBONDED CLASS FUNCTIONS
-NonBondedParam::NonBondedParam(double epsilon, double sigma)
-    : epsilon(epsilon), sigma(sigma) {}
+// NonBondedParam::NonBondedParam(double epsilon, double sigma)
+//     : epsilon(epsilon), sigma(sigma) {}
 
 // MOLECULE CLASS FUNCTIONS
 Molecule::Molecule()
@@ -103,7 +95,7 @@ vector<Angle> Molecule::get_angles() {
         Atom a1 = atoms[i];
         for (int a2 : a1.bonded_atoms) {
             for (int a3 : atoms[a2].bonded_atoms) {
-                if (a3 == i) {
+                if (a3 == i) { // Not true angle between three atoms
                     continue;
                 }
                 if (i < a3) { // Only add each angle once
@@ -115,6 +107,10 @@ vector<Angle> Molecule::get_angles() {
         }
     }
     return angles;
+}
+
+Atom& Molecule::get_atom(int index) {
+    return atoms.at(index);
 }
 
 // FORCE FIELD CLASS FUNCTIONS
@@ -149,7 +145,8 @@ double ForceField::calculate_bond_energy(Molecule mol) {
     double energy = 0.0;
     for (Bond bond : mol.bonds) {
         double r = atom_dist(mol.atoms[bond.atom1], mol.atoms[bond.atom2]);
-        energy += 0.5 * bond.param.k * pow(r - bond.param.r0, 2);
+        double delta_r = r - bond.param.r0;
+        energy += 0.5 * MDYNE_PER_A_TO_KCAL_PER_MOL * bond.param.k * pow(delta_r, 2) * (1 - (2.0 * delta_r) + (7.0/12.0 * (pow(-2, 2) * pow(delta_r, 2)))); // Quartic Morse potential
     }
     return energy;
 }
@@ -159,7 +156,9 @@ double ForceField::calculate_angle_energy(Molecule mol) {
     vector<Angle> angles = mol.get_angles();
     for (Angle angle : angles) {
         double theta = angle_between(mol.atoms[angle.atom1], mol.atoms[angle.atom2], mol.atoms[angle.atom3]);
-        energy += 0.5 * angle.param.k * pow(theta - angle.param.theta0, 2);
+        double delta_theta = theta - angle.param.theta0;
+        double c1 = MDYNE_PER_A_TO_KCAL_PER_MOL * pow(M_PI / 180.0, 2);
+        energy += 0.5 * c1 * angle.param.k * pow(delta_theta, 2) * (1.0 + (-0.007 * delta_theta)); // Harmonic potential with cubic bend expansion
     }
     return energy;
 }
@@ -181,8 +180,7 @@ Molecule read_sdf(const string filename) {
     iss.str(line);
     iss >> name;
 
-    // Read header (next 3 lines)
-    getline(file, line); // Molecule name
+    // Read header (next 2 lines)
     getline(file, line); // Info line
     getline(file, line); // Copyright line
 

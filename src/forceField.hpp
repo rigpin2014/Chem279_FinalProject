@@ -1,5 +1,4 @@
-#ifndef FORCEFIELD_HPP
-#define FORCEFIELD_HPP
+#pragma once
 
 #include <vector>
 #include <string>
@@ -7,6 +6,7 @@
 
 using namespace std;
 
+extern double MDYNE_PER_A_TO_KCAL_PER_MOL;
 extern map<string, int> element_to_atomic_number;
 
 class Atom {
@@ -72,6 +72,7 @@ class Molecule {
 
         void add_atom(int atomic_number, double x, double y, double z, int atom_type);
         void add_bond(int atom1, int atom2, BondParam param);
+        Atom& get_atom(int index);
 
         vector<Angle> get_angles();
 };
@@ -98,27 +99,23 @@ class ForceField {
         // double calculate_nonbonded_energy(Molecule mol);
 };
 
-class TorsionParam {
-    public:
-        double k;
-        double n;
-        double delta;
+// class TorsionParam {
+//     public:
+//         double k;
+//         double n;
+//         double delta;
 
-        TorsionParam(double k, double n, double delta);
-};
+//         TorsionParam(double k, double n, double delta);
+// };
 
-class NonBondedParam {
-    public:
-        double epsilon;
-        double sigma;
+// class NonBondedParam {
+//     public:
+//         double epsilon;
+//         double sigma;
 
-        NonBondedParam(double epsilon, double sigma);
-};
+//         NonBondedParam(double epsilon, double sigma);
+// };
 
 // Function to read a sdf file and return a Molecule object
 Molecule read_sdf(string filename);
 void assign_atom_types(Molecule& mol);
-
-#endif // FORCEFIELD_HPP
-
-
