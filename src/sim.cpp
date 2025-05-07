@@ -14,6 +14,9 @@
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
+// Seed a random number generator
+static std::mt19937 gen(std::random_device{}());
+
 ////////////////////////////////////////////////////////////////////////////////////////////
 //================================
 // Define some custom data types
@@ -86,13 +89,13 @@ class Molecule {
         bool decomposed = false;
 
         // Define force field constants
-        const double k_bond = 450.0;        // Bond stiffness (kcal/mol/A^2)
-        const double k_angle = 55.0;        // Angle stiffness (kcal/mol/rad^2)
+        const double k_bond = 19.5138;      // Bond stiffness (eV/A^2)
+        const double k_angle = 2.3850;      // Angle stiffness (eV/rad^2)
         const double r_eq = 0.9572;         // Equilibrium OH bond length (A)
         const double theta_eq = 1.824;      // Equilibrium HOH bond angle (rad)
 
         // Decomposition thresholds
-        const double OH_bond_critical_energy = 117.5;    // kcal/mol
+        const double OH_bond_critical_energy = 5.095;    // eV
         const double max_bond_angle = 2.27;              // rad
 
         // Private member functions
@@ -316,7 +319,8 @@ void read_cross_sections(
 
 // Define a function for the prompt fission spectrum
 double chi(double E) {
-    return 0.453 * std::exp(-1.036 * E) * std::sinh(std::sqrt(2.29 * E));
+    double E_MeV = E * 1e-6;
+    return 0.453 * std::exp(-1.036 * E_MeV) * std::sinh(std::sqrt(2.29 * E_MeV));
 }
 
 // Define a function to compute the cumulative distribution function (CDF)
@@ -356,13 +360,14 @@ void compute_chi_cdf(
 // Define a function to sample the CDF to obtain a neutron energy randomly.
 double sample_from_cdf(
     const std::vector<double>& data,
-    const std::vector<double>& cdf
+    const std::vector<double>& cdf,
+    std::mt19937& gen
 ){
     // Generate a random number uniformly between zero and one.
-    std::random_device rd;
-    std::mt19937 gen(rd());
     std::uniform_real_distribution<> dist(0.0, 1.0);
     double r = dist(gen);
+
+    std::cout << "Random Number: " << r << std::endl;
 
     // Define an iterator where cdf[i] >= r
     auto it = std::lower_bound(cdf.begin(), cdf.end(), r);
@@ -399,6 +404,8 @@ std::vector<double> extract_polynomials(
         }
     }
 
+    std::cout << "Using an assumed energy of: " << angular_distributions[min_idx].first << std::endl;
+
     return angular_distributions[min_idx].second;
 }
 
@@ -407,42 +414,50 @@ double compute_angular_pdf(
     double mu,
     const std::vector<double>& legendre_coeffs
 ){
-    double result = 0.5 * std::legendre(0, mu);
+    double result = 0.5 * std::legendre(0, mu);             // First legendre coefficient assumed to be 1
 
-    for (int l = 1; l < legendre_coeffs.size(); l++){
-        result += (2 * l + 1) * 0.5 * legendre_coeffs[l - 1] * std::legendre(l, mu);
+    for (int l = 1; l <= legendre_coeffs.size(); l++){
+        result += (2 * l + 1) * 0.5 * legendre_coeffs[l - 1] * std::legendre(l - 1, mu);
     }
 
     return result;
 }
 
-// Define a function to compute the most probable scattering angle
-double compute_most_probable_scattering_angle(
-    const std::vector<double>& legendre_coeffs
+// Define a function to perform rejection sampling of scattering angles
+double rejection_sample_scattering_angle(
+    const std::vector<double>& legendre_coeffs,
+    std::mt19937& gen
 ){
-    // Create a differential domain for mu on [-1, 1]
+    // Compute the maximum value of f_mu_E
     int N = 1000;
-    std::vector<double> mu_domain(N);
-    double dmu = 2 / (N - 1);
-
-    // Define the maximum values
-    double pdf_max = -1.0;
-    double mu_max = -1.0;
-
-    // Determine the most probable scattering angle by iterating through the
-    // probability distribution function
+    double f_max = 0.0;
     for (int i = 0; i < N; i++) {
-        double mu = -1.0 + i * dmu;
-        double pdf_curr = compute_angular_pdf(mu, legendre_coeffs);
-
-        // Update the maximum value 
-        if (pdf_curr > pdf_max) {
-            pdf_max = pdf_curr;
-            mu_max = mu;
-        }
+        double mu = -1.0 + 2 * i / (N - 1);
+        double pdf = compute_angular_pdf(mu, legendre_coeffs);
+        if (pdf > f_max) f_max = pdf;
     }
 
-    return std::acos(mu_max);
+    // Perform rejection sampling
+    std::uniform_real_distribution<> mu_dist(-1.0, 1.0);
+    std::uniform_real_distribution<>y_dist(0.0, f_max);
+
+    while (true) {
+        double mu_candidate = mu_dist(gen);
+        double y = y_dist(gen);
+        double f_mu = compute_angular_pdf(mu_candidate, legendre_coeffs);
+        if (y <= f_mu) return std::acos(mu_candidate);
+    }
+}
+
+// Define a function to compute the recoil energy
+double compute_recoil_energy(
+    const double& neutron_energy, 
+    const double& scattering_angle,
+    const int& atomic_number
+){
+    double FA = neutron_energy / std::pow(atomic_number + 1, 2);
+    double FB = std::pow(std::cos(scattering_angle) + std::sqrt(std::pow(atomic_number, 2) + std::pow(std::sin(scattering_angle), 2)), 2);
+    return  neutron_energy - (FA * FB);
 }
 
 
@@ -546,15 +561,35 @@ int main(int argc, char** argv){
     compute_chi_cdf(O16_cross_sections, energies, cdf);         // Modify in-place
 
     // Obtain a neutron energy from the prompt fission spectra
-    double neutron_energy = sample_from_cdf(energies, cdf);
+    double neutron_energy1 = sample_from_cdf(energies, cdf, gen);
+    std::cout << "Neutron Energy: " << neutron_energy1 << std::endl;
+    double neutron_energy2 = sample_from_cdf(energies, cdf, gen);
+    std::cout << "Neutron Energy: " << neutron_energy2 << std::endl;
+    double neutron_energy3 = sample_from_cdf(energies, cdf, gen);
+    std::cout << "Neutron Energy: " << neutron_energy3 << std::endl;
 
     // Extract the Legendre coefficients for the sampled neutron energy.
-    std::vector<double> legendre_coeffs = extract_polynomials(neutron_energy, H1_angular_distributions);
+    std::vector<double> legendre_coeffs1 = extract_polynomials(neutron_energy1, H1_angular_distributions);
+    std::vector<double> legendre_coeffs2 = extract_polynomials(neutron_energy2, H1_angular_distributions);
+    std::vector<double> legendre_coeffs3 = extract_polynomials(neutron_energy3, H1_angular_distributions);
 
     // Compute the most probable scattering angle in radians
-    double most_probable_theta = compute_most_probable_scattering_angle(legendre_coeffs);
+    double most_probable_theta1 = rejection_sample_scattering_angle(legendre_coeffs1, gen);
+    double most_probable_theta2 = rejection_sample_scattering_angle(legendre_coeffs2, gen);
+    double most_probable_theta3 = rejection_sample_scattering_angle(legendre_coeffs3, gen);
+    std::cout << "Rejection sample angle: " << most_probable_theta1 << std::endl;
+    std::cout << "Rejection sample angle: " << most_probable_theta2 << std::endl;
+    std::cout << "Rejection sample angle: " << most_probable_theta3 << std::endl;
 
-    std::cout << "Most probable angle: " << most_probable_theta << std::endl;
-    
+    // Compute the energy imparted unto the target atom nucleus
+    double recoil_energy1 = compute_recoil_energy(neutron_energy1, most_probable_theta1, atoms[0].atomic_number);
+    double recoil_energy2 = compute_recoil_energy(neutron_energy2, most_probable_theta2, atoms[0].atomic_number);
+    double recoil_energy3 = compute_recoil_energy(neutron_energy3, most_probable_theta3, atoms[0].atomic_number);
+    std::cout << "Recoil energy: " << recoil_energy1 * 0.0000859 << std::endl;
+    std::cout << "Recoil energy: " << recoil_energy2 * 0.0000859 << std::endl;
+    std::cout << "Recoil energy: " << recoil_energy3 * 0.0000859 << std::endl;
+
+
+
     return 0;
 }
