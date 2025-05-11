@@ -367,7 +367,7 @@ double sample_from_cdf(
     std::uniform_real_distribution<> dist(0.0, 1.0);
     double r = dist(gen);
 
-    std::cout << "Random Number: " << r << std::endl;
+    // std::cout << "Random Number: " << r << std::endl;
 
     // Define an iterator where cdf[i] >= r
     auto it = std::lower_bound(cdf.begin(), cdf.end(), r);
@@ -404,7 +404,7 @@ std::vector<double> extract_polynomials(
         }
     }
 
-    std::cout << "Using an assumed energy of: " << angular_distributions[min_idx].first << std::endl;
+    // std::cout << "Using an assumed energy of: " << angular_distributions[min_idx].first << std::endl;
 
     return angular_distributions[min_idx].second;
 }
@@ -552,7 +552,7 @@ int main(int argc, char** argv){
     std::cout << "Cross Section: " << O16_cross_sections[0].second << std::endl << std::endl;
 
     //===============================================================================
-    // MC Simulation
+    // Probability of Decomposition Calculation
     //===============================================================================
 
     // Define the neutron energies and the CDF
@@ -560,36 +560,70 @@ int main(int argc, char** argv){
     std::vector<double> cdf;
     compute_chi_cdf(O16_cross_sections, energies, cdf);         // Modify in-place
 
-    // Obtain a neutron energy from the prompt fission spectra
-    double neutron_energy1 = sample_from_cdf(energies, cdf, gen);
-    std::cout << "Neutron Energy: " << neutron_energy1 << std::endl;
-    double neutron_energy2 = sample_from_cdf(energies, cdf, gen);
-    std::cout << "Neutron Energy: " << neutron_energy2 << std::endl;
-    double neutron_energy3 = sample_from_cdf(energies, cdf, gen);
-    std::cout << "Neutron Energy: " << neutron_energy3 << std::endl;
+    // Count the number of n-H interactions which cause decompostion
+    double num_H_interactions = 268 * 86400;
+    int step_H = 0;
+    double num_H_decomposed = 0;
+    while (step_H < 10000) {
+        // Obtain a neutron energy from the prompt fission spectra
+        double neutron_energy = sample_from_cdf(energies, cdf, gen);
 
-    // Extract the Legendre coefficients for the sampled neutron energy.
-    std::vector<double> legendre_coeffs1 = extract_polynomials(neutron_energy1, H1_angular_distributions);
-    std::vector<double> legendre_coeffs2 = extract_polynomials(neutron_energy2, H1_angular_distributions);
-    std::vector<double> legendre_coeffs3 = extract_polynomials(neutron_energy3, H1_angular_distributions);
+        // Extract the Legendre coefficients for the sampled neutron energy.
+        std::vector<double> legendre_coeffs = extract_polynomials(neutron_energy, H1_angular_distributions);
 
-    // Compute the most probable scattering angle in radians
-    double most_probable_theta1 = rejection_sample_scattering_angle(legendre_coeffs1, gen);
-    double most_probable_theta2 = rejection_sample_scattering_angle(legendre_coeffs2, gen);
-    double most_probable_theta3 = rejection_sample_scattering_angle(legendre_coeffs3, gen);
-    std::cout << "Rejection sample angle: " << most_probable_theta1 << std::endl;
-    std::cout << "Rejection sample angle: " << most_probable_theta2 << std::endl;
-    std::cout << "Rejection sample angle: " << most_probable_theta3 << std::endl;
+        // Perform rejection sampling to calculate the scattering angle in radians.
+        double scattering_angle = rejection_sample_scattering_angle(legendre_coeffs, gen);
 
-    // Compute the energy imparted unto the target atom nucleus
-    double recoil_energy1 = compute_recoil_energy(neutron_energy1, most_probable_theta1, atoms[0].atomic_number);
-    double recoil_energy2 = compute_recoil_energy(neutron_energy2, most_probable_theta2, atoms[0].atomic_number);
-    double recoil_energy3 = compute_recoil_energy(neutron_energy3, most_probable_theta3, atoms[0].atomic_number);
-    std::cout << "Recoil energy: " << recoil_energy1 * 0.0000859 << std::endl;
-    std::cout << "Recoil energy: " << recoil_energy2 * 0.0000859 << std::endl;
-    std::cout << "Recoil energy: " << recoil_energy3 * 0.0000859 << std::endl;
+        // Compute the energy imparted unto the target atom nucleus
+        double recoil_energy = compute_recoil_energy(neutron_energy, scattering_angle, atoms[1].atomic_number);
 
+        // Compare the recoil energy to the minimum appearance energy
+        if (recoil_energy * 0.0000859 > 16) num_H_decomposed++;
 
+        // Increment the counter
+        step_H++;
+    }
+
+    // Count the number of n-H interactions which cause decompostion
+    double num_O_interactions = 22 * 86400;
+    int step_O = 0;
+    double num_O_decomposed = 0;
+    while (step_O < 10000) {
+        // Obtain a neutron energy from the prompt fission spectra
+        double neutron_energy = sample_from_cdf(energies, cdf, gen);
+
+        // Extract the Legendre coefficients for the sampled neutron energy.
+        std::vector<double> legendre_coeffs = extract_polynomials(neutron_energy, O16_angular_distributions);
+
+        // Perform rejection sampling to calculate the scattering angle in radians.
+        double scattering_angle = rejection_sample_scattering_angle(legendre_coeffs, gen);
+
+        // Compute the energy imparted unto the target atom nucleus
+        double recoil_energy = compute_recoil_energy(neutron_energy, scattering_angle, atoms[0].atomic_number);
+
+        // Compare the recoil energy to the minimum appearance energy
+        if (recoil_energy * 0.0000859 > 16) num_O_decomposed++;
+
+        // Increment the counter
+        step_O++;
+    }
+
+    // Calculate the results
+    double prob_H_decompose = num_H_decomposed / 10000;
+    double est_H_decompose = prob_H_decompose * num_H_interactions;
+
+    double prob_O_decompose = num_O_decomposed / 10000;
+    double est_O_decompose = prob_O_decompose * num_O_interactions;
+
+    double total_est_decomposed = est_H_decompose + est_O_decompose;
+    double total_num_interactions = num_H_interactions + num_O_interactions;
+    double result = total_est_decomposed/ total_num_interactions;
+    double factor = 1.0 / 2.05e-12;
+
+    std::cout << "The total number of radiolytic decompositions of water from the first neutron interaction with the moderator scaled to the entire core volume is: "
+              << total_est_decomposed * factor << std::endl;
+
+    std::cout << "Water will decompose upon interacting with the prompt neutron: " << result * 100<< " percent of the time" << std::endl;
 
     return 0;
 }
