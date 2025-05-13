@@ -1,0 +1,71 @@
+Ethane
+  NIST    07011509303D 1   1.00000   -79.83042
+Copyright by the U.S. Sec. Commerce on behalf of U.S.A. All rights reserved.
+  8  7  0  0  0  0  0  0  0  0999 V2000
+    0.5397    1.7666   -0.0025 H    0  0  0  0  0  0  0  0  0  0  0  0
+    0.7166    0.8980    0.6425 C    0  0  0  0  0  0  0  0  0  0  0  0
+    0.4899    0.0005    0.0551 H    0  0  0  0  0  0  0  0  0  0  0  0
+   -0.0078    0.9452    1.4640 H    0  0  0  0  0  0  0  0  0  0  0  0
+    2.1541    0.8745    1.1659 C    0  0  0  0  0  0  0  0  0  0  0  0
+    2.3313    0.0053    1.8100 H    0  0  0  0  0  0  0  0  0  0  0  0
+    2.8785    0.8284    0.3444 H    0  0  0  0  0  0  0  0  0  0  0  0
+    2.3805    1.7715    1.7542 H    0  0  0  0  0  0  0  0  0  0  0  0
+  1  2  1  0  0  0  0
+  2  3  1  0  0  0  0
+  2  4  1  0  0  0  0
+  2  5  1  0  0  0  0
+  5  6  1  0  0  0  0
+  5  7  1  0  0  0  0
+  5  8  1  0  0  0  0
+M  END
+> <COPYRIGHT>
+Collection (C) 2016 copyright by the U.S. Secretary of Commerce on behalf of the United States of America. All rights reserved.
+
+> <DATE>
+2015-07-01
+
+> <CAS.NUMBER>
+74-84-0
+
+> <METHOD>
+B3LYP/6-31G*
+
+> <DIPOLE.MOMENT>
+0.0000 debye
+
+> <ELECTRONIC.ENERGY>
+-79.8304218516 hartree
+
+> <IR.FREQUENCIES>
+"Frequency (cm-1)"   "Intensity (km/mol)"
+314.8517  0.0000
+832.5784  4.7232
+833.4334  4.7204
+1010.9991  0.0000
+1235.3421  0.0000
+1236.1525  0.0000
+1434.0909  0.2484
+1455.6744  0.0000
+1532.4665  0.0000
+1532.6573  0.0000
+1538.0052  7.4882
+1538.3804  7.4924
+3047.0878  0.0046
+3047.9741  59.2596
+3097.7980  0.0001
+3098.0638  0.0001
+3122.1834  74.0432
+3122.4203  74.0443
+
+> <ROTATIONAL.CONSTANTS>
+80.23088 GHz
+19.89240 GHz
+19.89232 GHz
+
+> <SOFTWARE>
+Gaussian 09, Revision D.01
+
+> <CONTRIBUTOR>
+Avi Newman
+
+$$$$
